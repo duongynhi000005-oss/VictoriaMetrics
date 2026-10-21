@@ -26,6 +26,8 @@ See also [LTS releases](https://docs.victoriametrics.com/victoriametrics/lts-rel
 
 ## tip
 
+* FEATURE: [vmsingle](https://docs.victoriametrics.com/victoriametrics/single-server-victoriametrics/) and `vmselect` in [VictoriaMetrics cluster](https://docs.victoriametrics.com/victoriametrics/cluster-victoriametrics/): speed up the `or` binary operator when many series on both sides have the same matching labels, for example `a or on() b`. Previously, the operator marshaled series names again for each pair of series and each data point. See [#10374](https://github.com/VictoriaMetrics/VictoriaMetrics/issues/10374).
+
 ## [v1.155.0](https://github.com/VictoriaMetrics/VictoriaMetrics/releases/tag/v1.155.0)
 
 Release candidate
