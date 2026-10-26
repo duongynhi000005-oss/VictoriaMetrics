@@ -22,25 +22,24 @@ func getStatGeneric(statName, sysfsPrefix, cgroupPath, cgroupGrepLine string) (i
 }
 
 func getFileContents(statName, sysfsPrefix, cgroupPath, cgroupGrepLine string) (string, error) {
+	// Try reading the stat from the process's own cgroup subpath first.
+	// This prevents root cgroup files from shadowing service-level limits on hosts
+	// where root sysfs files are readable (e.g. systemd slices).
+	if cgroupData, err := os.ReadFile(cgroupPath); err == nil {
+		if subPath, err := grepFirstMatch(string(cgroupData), cgroupGrepLine, 2, ":"); err == nil {
+			filepath := path.Join(sysfsPrefix, subPath, statName)
+			if data, err := os.ReadFile(filepath); err == nil {
+				return string(data), nil
+			}
+		}
+	}
+	// Fall back to reading from sysfsPrefix directly (e.g. container mounts or root cgroup).
 	filepath := path.Join(sysfsPrefix, statName)
 	data, err := os.ReadFile(filepath)
 	if err == nil {
 		return string(data), nil
 	}
-	cgroupData, err := os.ReadFile(cgroupPath)
-	if err != nil {
-		return "", err
-	}
-	subPath, err := grepFirstMatch(string(cgroupData), cgroupGrepLine, 2, ":")
-	if err != nil {
-		return "", fmt.Errorf("cannot find cgroup path for %q in %q: %w", cgroupGrepLine, cgroupPath, err)
-	}
-	filepath = path.Join(sysfsPrefix, subPath, statName)
-	data, err = os.ReadFile(filepath)
-	if err != nil {
-		return "", err
-	}
-	return string(data), nil
+	return "", err
 }
 
 // readCgroupV2SubPath reads cgroupv2 sub-path
