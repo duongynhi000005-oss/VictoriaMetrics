@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/VictoriaMetrics/VictoriaMetrics/lib/storage"
+	"github.com/VictoriaMetrics/VictoriaMetrics/lib/storage/metricsmetadata"
 )
 
 func TestApplyFiltersToTenants(t *testing.T) {
@@ -55,4 +56,61 @@ func TestIsTenancyLabel(t *testing.T) {
 	f("job", false)
 	f("instance", false)
 
+}
+
+func TestFilterMetadataByTenants(t *testing.T) {
+	row := func(accountID, projectID uint32, name string) *metricsmetadata.Row {
+		return &metricsmetadata.Row{
+			AccountID:        accountID,
+			ProjectID:        projectID,
+			MetricFamilyName: []byte(name),
+		}
+	}
+
+	f := func(filters [][]storage.TagFilter, rows, expected []*metricsmetadata.Row) {
+		t.Helper()
+		input := append([]*metricsmetadata.Row(nil), rows...)
+		tenantFilters, _ := splitFiltersByType(filters)
+		got, err := filterMetadataByTenants(input, tenantFilters)
+		if err != nil {
+			t.Fatalf("unexpected error: %s", err)
+		}
+		if !reflect.DeepEqual(got, expected) {
+			t.Fatalf("unexpected filtered metadata rows; got %v; want %v", got, expected)
+		}
+	}
+
+	allRows := []*metricsmetadata.Row{
+		row(1, 0, "m1"),
+		row(12, 0, "m2"),
+		row(34, 0, "m3"),
+		row(34, 1, "m4"),
+	}
+
+	// nil filters -> all rows
+	f(nil, allRows, allRows)
+
+	// non-tenancy filter only -> all rows
+	f([][]storage.TagFilter{{{Key: []byte("job"), Value: []byte("foo")}}}, allRows, allRows)
+
+	// regex match on vm_account_id and exact match on vm_project_id
+	f(
+		[][]storage.TagFilter{{{Key: []byte("vm_account_id"), Value: []byte("12|34"), IsRegexp: true}, {Key: []byte("vm_project_id"), Value: []byte("0")}}},
+		allRows,
+		[]*metricsmetadata.Row{row(12, 0, "m2"), row(34, 0, "m3")},
+	)
+
+	// negative match on vm_project_id
+	f(
+		[][]storage.TagFilter{{{Key: []byte("vm_account_id"), Value: []byte("34")}, {Key: []byte("vm_project_id"), Value: []byte("0"), IsNegative: true}}},
+		allRows,
+		[]*metricsmetadata.Row{row(34, 1, "m4")},
+	)
+
+	// no matching tenants -> nil
+	f(
+		[][]storage.TagFilter{{{Key: []byte("vm_account_id"), Value: []byte("999")}}},
+		allRows,
+		nil,
+	)
 }

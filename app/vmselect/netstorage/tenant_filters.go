@@ -10,6 +10,7 @@ import (
 	"github.com/VictoriaMetrics/VictoriaMetrics/lib/promrelabel"
 	"github.com/VictoriaMetrics/VictoriaMetrics/lib/querytracer"
 	"github.com/VictoriaMetrics/VictoriaMetrics/lib/storage"
+	"github.com/VictoriaMetrics/VictoriaMetrics/lib/storage/metricsmetadata"
 )
 
 // GetTenantTokensFromFilters returns the list of tenant tokens and the list of filters without tenant filters.
@@ -109,6 +110,51 @@ func applyFiltersToTenants(tenants []storage.TenantToken, filters [][]storage.Ta
 	}
 
 	return resultingTokens, nil
+}
+
+// filterMetadataByTenants filters metadata rows by the given tenant filters.
+func filterMetadataByTenants(rows []*metricsmetadata.Row, tenantFilters [][]storage.TagFilter) ([]*metricsmetadata.Row, error) {
+	if len(tenantFilters) == 0 || len(rows) == 0 {
+		return rows, nil
+	}
+
+	seenTenants := make(map[storage.TenantToken]struct{})
+	tenants := make([]storage.TenantToken, 0)
+	for _, r := range rows {
+		tt := storage.TenantToken{
+			AccountID: r.AccountID,
+			ProjectID: r.ProjectID,
+		}
+		if _, ok := seenTenants[tt]; !ok {
+			seenTenants[tt] = struct{}{}
+			tenants = append(tenants, tt)
+		}
+	}
+
+	matchedTenants, err := applyFiltersToTenants(tenants, tenantFilters)
+	if err != nil {
+		return nil, err
+	}
+	if len(matchedTenants) == 0 {
+		return nil, nil
+	}
+
+	allowedTenants := make(map[storage.TenantToken]struct{}, len(matchedTenants))
+	for _, tt := range matchedTenants {
+		allowedTenants[tt] = struct{}{}
+	}
+
+	dst := rows[:0]
+	for _, r := range rows {
+		tt := storage.TenantToken{
+			AccountID: r.AccountID,
+			ProjectID: r.ProjectID,
+		}
+		if _, ok := allowedTenants[tt]; ok {
+			dst = append(dst, r)
+		}
+	}
+	return dst, nil
 }
 
 // isTenancyLabel returns true if the given label name is used for tenancy.

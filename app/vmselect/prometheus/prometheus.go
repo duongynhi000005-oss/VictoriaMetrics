@@ -868,16 +868,22 @@ func MetadataHandler(qt *querytracer.Tracer, startTime time.Time, at *auth.Token
 	metricName := r.FormValue("metric")
 
 	var tt *storage.TenantToken
+	var etfs [][]storage.TagFilter
 	if at != nil {
 		tt = &storage.TenantToken{
 			AccountID: at.AccountID,
 			ProjectID: at.ProjectID,
 		}
+	} else {
+		etfs, err = searchutil.GetExtraTagFilters(r)
+		if err != nil {
+			return httpserver.InvalidParamError(err)
+		}
 	}
 
 	denyPartialResponse := httputil.GetDenyPartialResponse(r)
 
-	metadata, isPartial, err := netstorage.GetMetricsMetadata(ctx, qt, tt, denyPartialResponse, limit, metricName)
+	metadata, isPartial, err := netstorage.GetMetricsMetadata(ctx, qt, tt, etfs, denyPartialResponse, limit, metricName)
 	if err != nil {
 		return fmt.Errorf("cannot get metadata: %w", err)
 	}

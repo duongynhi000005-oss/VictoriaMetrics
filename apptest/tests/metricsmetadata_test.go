@@ -254,4 +254,40 @@ func TestClusterMetricsMetadata(t *testing.T) {
 			},
 		},
 	})
+
+	// check multitenant metadata filtering via extra_filters[] and extra_label
+	vminsert1.PrometheusAPIV1ImportPrometheus(t, []string{
+		`# HELP tenant_12_metric help for tenant 12`,
+		`# TYPE tenant_12_metric counter`,
+		`tenant_12_metric 1`,
+	}, apptest.QueryOpts{Tenant: "12:0"})
+	vminsert2.PrometheusAPIV1ImportPrometheus(t, []string{
+		`# HELP tenant_34_metric help for tenant 34`,
+		`# TYPE tenant_34_metric gauge`,
+		`tenant_34_metric 1`,
+	}, apptest.QueryOpts{Tenant: "34:0"})
+	vminsert1.PrometheusAPIV1ImportPrometheus(t, []string{
+		`# HELP tenant_99_metric help for tenant 99`,
+		`# TYPE tenant_99_metric gauge`,
+		`tenant_99_metric 1`,
+	}, apptest.QueryOpts{Tenant: "99:1"})
+	vmstorage1.ForceFlush(t)
+	vmstorage2.ForceFlush(t)
+
+	tc.Assert(&apptest.AssertOptions{
+		Msg: "unexpected multitenant /api/v1/metadata response with extra_filters[]",
+		Got: func() any {
+			return vmselect.PrometheusAPIV1Metadata(t, "", 0, apptest.QueryOpts{
+				Tenant:       "multitenant",
+				ExtraFilters: []string{`{vm_account_id=~"12|34",vm_project_id="0"}`},
+			})
+		},
+		Want: &apptest.PrometheusAPIV1Metadata{
+			Status: "success",
+			Data: map[string][]apptest.MetadataEntry{
+				"tenant_12_metric": {{Help: "help for tenant 12", Type: "counter"}},
+				"tenant_34_metric": {{Help: "help for tenant 34", Type: "gauge"}},
+			},
+		},
+	})
 }

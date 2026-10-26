@@ -117,7 +117,7 @@ func (api *vmstorageAPI) GetMetricNamesUsageStats(ctx context.Context, qt *query
 }
 
 func (api *vmstorageAPI) GetMetadataRecords(ctx context.Context, qt *querytracer.Tracer, tt *storage.TenantToken, limit int, metricName string) ([]*metricsmetadata.Row, error) {
-	meta, _, err := netstorage.GetMetricsMetadata(ctx, qt, tt, true, limit, metricName)
+	meta, _, err := netstorage.GetMetricsMetadata(ctx, qt, tt, nil, true, limit, metricName)
 	return meta, wrapClusterNativeError(err)
 }
 

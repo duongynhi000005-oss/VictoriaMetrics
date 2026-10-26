@@ -983,7 +983,8 @@ Metadata is ingested independently from metrics, so a metric can exist without m
 Metadata is expected to be ephemeral and constantly updated on ingestion. For this reason, metadata cache isn't
 persisted during storage restarts.
 
-Metadata supports [multitenancy](#multitenancy) and can be queried via the `/select/<accountID>/prometheus/api/v1/metadata` endpoint, which provides a response compatible with the Prometheus [metadata API](https://prometheus.io/docs/prometheus/latest/querying/api/#querying-metric-metadata).
+Metadata supports [multitenancy](#multitenancy) and can be queried via the `/select/<accountID>/prometheus/api/v1/metadata` or `/select/multitenant/prometheus/api/v1/metadata` endpoints, which provide a response compatible with the Prometheus [metadata API](https://prometheus.io/docs/prometheus/latest/querying/api/#querying-metric-metadata).
+The `/select/multitenant/prometheus/api/v1/metadata` endpoint also supports filtering by `vm_account_id` and `vm_project_id` via `extra_filters[]` and `extra_label` query arguments (for example, `extra_filters[]={vm_account_id=~"12|34",vm_project_id="0"}`).
 If multiple vmstorage nodes return metadata for the same metric family name, or if multiple tenants have metadata for the same metric family name, vmselect returns only the first matching result.
 Duplicate metadata entries are not merged or deduplicated across storages or tenants. See [/api/v1/metadata](https://docs.victoriametrics.com/victoriametrics/url-examples/#apiv1metadata) example.
 

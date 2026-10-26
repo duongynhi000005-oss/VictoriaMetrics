@@ -1159,11 +1159,21 @@ func Tenants(ctx context.Context, qt *querytracer.Tracer, tr storage.TimeRange) 
 }
 
 // GetMetricsMetadata returns time series metric names metadata for the given args
-func GetMetricsMetadata(ctx context.Context, qt *querytracer.Tracer, tt *storage.TenantToken, denyPartialResponse bool, limit int, metricName string) ([]*metricsmetadata.Row, bool, error) {
+func GetMetricsMetadata(ctx context.Context, qt *querytracer.Tracer, tt *storage.TenantToken, tfs [][]storage.TagFilter, denyPartialResponse bool, limit int, metricName string) ([]*metricsmetadata.Row, bool, error) {
 	qt = qt.NewChild("get metrics metadata: limit=%d, metric_name=%q", limit, metricName)
 	defer qt.Done()
 	if err := ctx.Err(); err != nil {
 		return nil, false, fmt.Errorf("context error before starting the query processing: %w", searchutil.AnnotateContextError(ctx))
+	}
+	var tenantFilters [][]storage.TagFilter
+	nodeLimit := limit
+	if tt == nil {
+		tenantFilters, _ = splitFiltersByType(tfs)
+		if len(tenantFilters) > 0 {
+			// Request unfiltered metadata from vmstorage nodes when tenant filters are present,
+			// so limit can be applied after filtering by tenants.
+			nodeLimit = 0
+		}
 	}
 	type nodeResult struct {
 		metadata []*metricsmetadata.Row
@@ -1172,7 +1182,7 @@ func GetMetricsMetadata(ctx context.Context, qt *querytracer.Tracer, tt *storage
 	sns := getStorageNodes()
 	snr := startStorageNodesRequest(qt, sns, denyPartialResponse, func(qt *querytracer.Tracer, _ uint, sn *storageNode) any {
 		sn.metricsMetadataRequests.Inc()
-		metadata, err := sn.getMetricsMetadata(ctx, qt, tt, limit, metricName)
+		metadata, err := sn.getMetricsMetadata(ctx, qt, tt, nodeLimit, metricName)
 		if err != nil {
 			sn.metricsMetadataErrors.Inc()
 			err = fmt.Errorf("cannot get metrics metadata from vmstorage %s: %w", sn.connPool.Addr(), err)
@@ -1194,6 +1204,12 @@ func GetMetricsMetadata(ctx context.Context, qt *querytracer.Tracer, tt *storage
 	})
 	if err != nil {
 		return nil, isPartial, fmt.Errorf("cannot fetch metrics metadata from vmstorage nodes: %w", err)
+	}
+	if len(tenantFilters) > 0 {
+		metadata, err = filterMetadataByTenants(metadata, tenantFilters)
+		if err != nil {
+			return nil, isPartial, fmt.Errorf("cannot apply tenant filters to metadata: %w", err)
+		}
 	}
 
 	return metadata, isPartial, nil
