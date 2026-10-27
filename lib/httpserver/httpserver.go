@@ -83,7 +83,15 @@ var (
 type server struct {
 	shutdownDelayDeadline atomic.Int64
 	s                     *http.Server
-	cancel                context.CancelFunc
+	cancel                context.CancelCauseFunc
+}
+
+var errServerCanceled = errors.New("http server is shutting down")
+
+// IsClientCanceled returns true if err is context.Canceled caused by client disconnect
+// rather than server shutdown.
+func IsClientCanceled(ctx context.Context, err error) bool {
+	return errors.Is(err, context.Canceled) && !errors.Is(context.Cause(ctx), errServerCanceled)
 }
 
 // RequestHandler must serve the given request r and write response to w.
@@ -185,7 +193,7 @@ func serve(addr string, rh RequestHandler, idx int, opts ServeOptions) {
 func serveWithListener(addr string, ln net.Listener, rh RequestHandler, disableBuiltinRoutes bool) {
 	var s server
 
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancelCause(context.Background())
 	s.s = &http.Server{
 		BaseContext: func(l net.Listener) context.Context {
 			return ctx
@@ -308,7 +316,9 @@ func stop(addr string) error {
 	ctx, cancel := context.WithTimeout(context.Background(), *maxGracefulShutdownDuration)
 	defer cancel()
 
-	t := time.AfterFunc(cancelInflightAfter, s.cancel)
+	t := time.AfterFunc(cancelInflightAfter, func() {
+		s.cancel(errServerCanceled)
+	})
 	defer t.Stop()
 
 	if err := s.s.Shutdown(ctx); err != nil {

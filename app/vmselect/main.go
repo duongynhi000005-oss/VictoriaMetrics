@@ -185,7 +185,7 @@ func RequestHandler(w http.ResponseWriter, r *http.Request) bool {
 			labelName := s[:len(s)-len("/values")]
 			httpserver.EnableCORS(w, r)
 			if err := prometheus.LabelValuesHandler(qt, startTime, labelName, w, r); err != nil {
-				labelValuesErrors.Inc()
+				incErrorCounterIfNeeded(r, labelValuesErrors, err)
 				httpserver.SendPrometheusError(w, r, err)
 				return true
 			}
@@ -196,7 +196,7 @@ func RequestHandler(w http.ResponseWriter, r *http.Request) bool {
 		tagName := path[len("/tags/"):]
 		graphiteTagValuesRequests.Inc()
 		if err := graphite.TagValuesHandler(startTime, tagName, w, r); err != nil {
-			graphiteTagValuesErrors.Inc()
+			incErrorCounterIfNeeded(r, graphiteTagValuesErrors, err)
 			httpserver.Errorf(w, r, "%s", err)
 			return true
 		}
@@ -208,7 +208,7 @@ func RequestHandler(w http.ResponseWriter, r *http.Request) bool {
 		queryRequests.Inc()
 		httpserver.EnableCORS(w, r)
 		if err := prometheus.QueryHandler(qt, startTime, w, r); err != nil {
-			queryErrors.Inc()
+			incErrorCounterIfNeeded(r, queryErrors, err)
 			httpserver.SendPrometheusError(w, r, err)
 			return true
 		}
@@ -217,7 +217,7 @@ func RequestHandler(w http.ResponseWriter, r *http.Request) bool {
 		queryRangeRequests.Inc()
 		httpserver.EnableCORS(w, r)
 		if err := prometheus.QueryRangeHandler(qt, startTime, w, r); err != nil {
-			queryRangeErrors.Inc()
+			incErrorCounterIfNeeded(r, queryRangeErrors, err)
 			httpserver.SendPrometheusError(w, r, err)
 			return true
 		}
@@ -226,7 +226,7 @@ func RequestHandler(w http.ResponseWriter, r *http.Request) bool {
 		seriesRequests.Inc()
 		httpserver.EnableCORS(w, r)
 		if err := prometheus.SeriesHandler(qt, startTime, w, r); err != nil {
-			seriesErrors.Inc()
+			incErrorCounterIfNeeded(r, seriesErrors, err)
 			httpserver.SendPrometheusError(w, r, err)
 			return true
 		}
@@ -235,7 +235,7 @@ func RequestHandler(w http.ResponseWriter, r *http.Request) bool {
 		seriesCountRequests.Inc()
 		httpserver.EnableCORS(w, r)
 		if err := prometheus.SeriesCountHandler(startTime, w, r); err != nil {
-			seriesCountErrors.Inc()
+			incErrorCounterIfNeeded(r, seriesCountErrors, err)
 			httpserver.SendPrometheusError(w, r, err)
 			return true
 		}
@@ -244,7 +244,7 @@ func RequestHandler(w http.ResponseWriter, r *http.Request) bool {
 		labelsRequests.Inc()
 		httpserver.EnableCORS(w, r)
 		if err := prometheus.LabelsHandler(qt, startTime, w, r); err != nil {
-			labelsErrors.Inc()
+			incErrorCounterIfNeeded(r, labelsErrors, err)
 			httpserver.SendPrometheusError(w, r, err)
 			return true
 		}
@@ -253,7 +253,7 @@ func RequestHandler(w http.ResponseWriter, r *http.Request) bool {
 		statusTSDBRequests.Inc()
 		httpserver.EnableCORS(w, r)
 		if err := prometheus.TSDBStatusHandler(qt, startTime, w, r); err != nil {
-			statusTSDBErrors.Inc()
+			incErrorCounterIfNeeded(r, statusTSDBErrors, err)
 			httpserver.SendPrometheusError(w, r, err)
 			return true
 		}
@@ -262,7 +262,7 @@ func RequestHandler(w http.ResponseWriter, r *http.Request) bool {
 		exportRequests.Inc()
 		httpserver.EnableCORS(w, r)
 		if err := prometheus.ExportHandler(startTime, w, r); err != nil {
-			exportErrors.Inc()
+			incErrorCounterIfNeeded(r, exportErrors, err)
 			httpserver.Errorf(w, r, "%s", err)
 			return true
 		}
@@ -271,7 +271,7 @@ func RequestHandler(w http.ResponseWriter, r *http.Request) bool {
 		exportCSVRequests.Inc()
 		httpserver.EnableCORS(w, r)
 		if err := prometheus.ExportCSVHandler(startTime, w, r); err != nil {
-			exportCSVErrors.Inc()
+			incErrorCounterIfNeeded(r, exportCSVErrors, err)
 			httpserver.Errorf(w, r, "%s", err)
 			return true
 		}
@@ -280,7 +280,7 @@ func RequestHandler(w http.ResponseWriter, r *http.Request) bool {
 		exportNativeRequests.Inc()
 		httpserver.EnableCORS(w, r)
 		if err := prometheus.ExportNativeHandler(startTime, w, r); err != nil {
-			exportNativeErrors.Inc()
+			incErrorCounterIfNeeded(r, exportNativeErrors, err)
 			httpserver.Errorf(w, r, "%s", err)
 			return true
 		}
@@ -288,7 +288,7 @@ func RequestHandler(w http.ResponseWriter, r *http.Request) bool {
 	case "/federate":
 		federateRequests.Inc()
 		if err := prometheus.FederateHandler(startTime, w, r); err != nil {
-			federateErrors.Inc()
+			incErrorCounterIfNeeded(r, federateErrors, err)
 			httpserver.Errorf(w, r, "%s", err)
 			return true
 		}
@@ -297,7 +297,7 @@ func RequestHandler(w http.ResponseWriter, r *http.Request) bool {
 		graphiteMetricsFindRequests.Inc()
 		httpserver.EnableCORS(w, r)
 		if err := graphite.MetricsFindHandler(startTime, w, r); err != nil {
-			graphiteMetricsFindErrors.Inc()
+			incErrorCounterIfNeeded(r, graphiteMetricsFindErrors, err)
 			httpserver.Errorf(w, r, "%s", err)
 			return true
 		}
@@ -306,7 +306,7 @@ func RequestHandler(w http.ResponseWriter, r *http.Request) bool {
 		graphiteMetricsExpandRequests.Inc()
 		httpserver.EnableCORS(w, r)
 		if err := graphite.MetricsExpandHandler(startTime, w, r); err != nil {
-			graphiteMetricsExpandErrors.Inc()
+			incErrorCounterIfNeeded(r, graphiteMetricsExpandErrors, err)
 			httpserver.Errorf(w, r, "%s", err)
 			return true
 		}
@@ -315,7 +315,7 @@ func RequestHandler(w http.ResponseWriter, r *http.Request) bool {
 		graphiteMetricsIndexRequests.Inc()
 		httpserver.EnableCORS(w, r)
 		if err := graphite.MetricsIndexHandler(startTime, w, r); err != nil {
-			graphiteMetricsIndexErrors.Inc()
+			incErrorCounterIfNeeded(r, graphiteMetricsIndexErrors, err)
 			httpserver.Errorf(w, r, "%s", err)
 			return true
 		}
@@ -343,7 +343,7 @@ func RequestHandler(w http.ResponseWriter, r *http.Request) bool {
 	case "/tags":
 		graphiteTagsRequests.Inc()
 		if err := graphite.TagsHandler(startTime, w, r); err != nil {
-			graphiteTagsErrors.Inc()
+			incErrorCounterIfNeeded(r, graphiteTagsErrors, err)
 			httpserver.Errorf(w, r, "%s", err)
 			return true
 		}
@@ -351,7 +351,7 @@ func RequestHandler(w http.ResponseWriter, r *http.Request) bool {
 	case "/tags/findSeries":
 		graphiteTagsFindSeriesRequests.Inc()
 		if err := graphite.TagsFindSeriesHandler(startTime, w, r); err != nil {
-			graphiteTagsFindSeriesErrors.Inc()
+			incErrorCounterIfNeeded(r, graphiteTagsFindSeriesErrors, err)
 			httpserver.Errorf(w, r, "%s", err)
 			return true
 		}
@@ -360,7 +360,7 @@ func RequestHandler(w http.ResponseWriter, r *http.Request) bool {
 		graphiteTagsAutoCompleteTagsRequests.Inc()
 		httpserver.EnableCORS(w, r)
 		if err := graphite.TagsAutoCompleteTagsHandler(startTime, w, r); err != nil {
-			graphiteTagsAutoCompleteTagsErrors.Inc()
+			incErrorCounterIfNeeded(r, graphiteTagsAutoCompleteTagsErrors, err)
 			httpserver.Errorf(w, r, "%s", err)
 			return true
 		}
@@ -369,7 +369,7 @@ func RequestHandler(w http.ResponseWriter, r *http.Request) bool {
 		graphiteTagsAutoCompleteValuesRequests.Inc()
 		httpserver.EnableCORS(w, r)
 		if err := graphite.TagsAutoCompleteValuesHandler(startTime, w, r); err != nil {
-			graphiteTagsAutoCompleteValuesErrors.Inc()
+			incErrorCounterIfNeeded(r, graphiteTagsAutoCompleteValuesErrors, err)
 			httpserver.Errorf(w, r, "%s", err)
 			return true
 		}
@@ -384,7 +384,7 @@ func RequestHandler(w http.ResponseWriter, r *http.Request) bool {
 		}
 		graphiteTagsDelSeriesRequests.Inc()
 		if err := graphite.TagsDelSeriesHandler(startTime, w, r); err != nil {
-			graphiteTagsDelSeriesErrors.Inc()
+			incErrorCounterIfNeeded(r, graphiteTagsDelSeriesErrors, err)
 			httpserver.Errorf(w, r, "%s", err)
 			return true
 		}
@@ -392,7 +392,7 @@ func RequestHandler(w http.ResponseWriter, r *http.Request) bool {
 	case "/render":
 		graphiteRenderRequests.Inc()
 		if err := graphite.RenderHandler(startTime, w, r); err != nil {
-			graphiteRenderErrors.Inc()
+			incErrorCounterIfNeeded(r, graphiteRenderErrors, err)
 			httpserver.Errorf(w, r, "error in %q: %s", r.URL.Path, err)
 			return true
 		}
@@ -407,7 +407,7 @@ func RequestHandler(w http.ResponseWriter, r *http.Request) bool {
 		}
 		deleteRequests.Inc()
 		if err := prometheus.DeleteHandler(startTime, r); err != nil {
-			deleteErrors.Inc()
+			incErrorCounterIfNeeded(r, deleteErrors, err)
 			httpserver.Errorf(w, r, "%s", err)
 			return true
 		}
@@ -417,7 +417,7 @@ func RequestHandler(w http.ResponseWriter, r *http.Request) bool {
 		metricNamesStatsRequests.Inc()
 		httpserver.EnableCORS(w, r)
 		if err := stats.MetricNamesStatsHandler(startTime, qt, w, r); err != nil {
-			metricNamesStatsErrors.Inc()
+			incErrorCounterIfNeeded(r, metricNamesStatsErrors, err)
 			httpserver.Errorf(w, r, "%s", err)
 			return true
 		}
@@ -428,7 +428,7 @@ func RequestHandler(w http.ResponseWriter, r *http.Request) bool {
 			return true
 		}
 		if err := stats.ResetMetricNamesStatsHandler(startTime, qt, r); err != nil {
-			metricNamesStatsResetErrors.Inc()
+			incErrorCounterIfNeeded(r, metricNamesStatsResetErrors, err)
 			httpserver.Errorf(w, r, "%s", err)
 			return true
 		}
@@ -438,7 +438,7 @@ func RequestHandler(w http.ResponseWriter, r *http.Request) bool {
 		// Return dumb placeholder for https://prometheus.io/docs/prometheus/latest/querying/api/#querying-metric-metadata
 		metadataRequests.Inc()
 		if err := prometheus.MetadataHandler(qt, startTime, w, r); err != nil {
-			metadataErrors.Inc()
+			incErrorCounterIfNeeded(r, metadataErrors, err)
 			httpserver.SendPrometheusError(w, r, err)
 			return true
 		}
@@ -446,6 +446,12 @@ func RequestHandler(w http.ResponseWriter, r *http.Request) bool {
 
 	default:
 		return false
+	}
+}
+
+func incErrorCounterIfNeeded(r *http.Request, c *metrics.Counter, err error) {
+	if !httpserver.IsClientCanceled(r.Context(), err) {
+		c.Inc()
 	}
 }
 
@@ -548,7 +554,7 @@ func handleStaticAndSimpleRequests(w http.ResponseWriter, r *http.Request, path 
 		topQueriesRequests.Inc()
 		httpserver.EnableCORS(w, r)
 		if err := prometheus.QueryStatsHandler(w, r); err != nil {
-			topQueriesErrors.Inc()
+			incErrorCounterIfNeeded(r, topQueriesErrors, err)
 			httpserver.SendPrometheusError(w, r, fmt.Errorf("cannot query status endpoint: %w", err))
 			return true
 		}

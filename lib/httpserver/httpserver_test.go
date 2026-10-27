@@ -1,11 +1,14 @@
 package httpserver
 
 import (
+	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/VictoriaMetrics/VictoriaMetrics/lib/flagutil"
 )
@@ -318,4 +321,33 @@ func TestIsProtectedByAuthFlag(t *testing.T) {
 
 	f("/api/v1/query", false, false)
 	f("/api/v1/query", true, true)
+}
+
+func TestIsClientCanceled(t *testing.T) {
+	baseCtx, baseCancel := context.WithCancelCause(context.Background())
+
+	// 1. Client cancels request while server is running -> IsClientCanceled == true
+	clientCtx, clientCancel := context.WithCancel(baseCtx)
+	clientCancel()
+	wrappedErr := fmt.Errorf("query aborted: %w", clientCtx.Err())
+	if !IsClientCanceled(clientCtx, wrappedErr) {
+		t.Fatalf("expected IsClientCanceled to return true for client-canceled context")
+	}
+
+	// 2. Request times out -> IsClientCanceled == false
+	timeoutCtx, timeoutCancel := context.WithTimeout(baseCtx, -time.Second)
+	defer timeoutCancel()
+	timeoutErr := fmt.Errorf("query timed out: %w", timeoutCtx.Err())
+	if IsClientCanceled(timeoutCtx, timeoutErr) {
+		t.Fatalf("expected IsClientCanceled to return false for context.DeadlineExceeded")
+	}
+
+	// 3. Server shuts down -> IsClientCanceled == false
+	reqCtx, reqCancel := context.WithCancel(baseCtx)
+	defer reqCancel()
+	baseCancel(errServerCanceled)
+	serverCancelErr := fmt.Errorf("server stopped: %w", reqCtx.Err())
+	if IsClientCanceled(reqCtx, serverCancelErr) {
+		t.Fatalf("expected IsClientCanceled to return false when server shuts down")
+	}
 }
